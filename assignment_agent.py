@@ -44,9 +44,47 @@ toolset.register_tools(
     executor=user_proxy,
 )
 
+def get_courses():
+    courses = toolset.execute_action(
+        action=Action.CANVAS_LIST_COURSES,
+        entity_id="karthik",
+        params={}
+    )
+    return courses
+
+def get_assignments(course_id):
+    assignments = toolset.execute_action(
+        action=Action.CANVAS_GET_ALL_ASSIGNMENTS,
+        entity_id="karthik",
+        params={"course_id": course_id}
+    )
+    return assignments
+
+def get_course_id_by_name():
+    courses_response = get_courses()
+    if not courses_response.get('successfull'):
+        print("Failed to fetch courses")
+        return None
+    
+    courses_data = courses_response['data']['response_data']
+    available_courses = {course['name'].strip(): course['id'] for course in courses_data}
+    
+    print("\nAvailable courses:")
+    for course_name in available_courses.keys():
+        print(f"- {course_name}")
+    
+    while True:
+        course_name = input("\nEnter course name: ").strip()
+        if course_name in available_courses:
+            return available_courses[course_name]
+        print(f"Course '{course_name}' not found. Please try again.")
+
 def get_create_assignment_task():
-    course_id = input("Enter course ID: ")
-    name = input("Enter assignment name: ")
+    course_id = get_course_id_by_name()
+    if not course_id:
+        return None
+    
+    name = input("\nEnter assignment name: ").strip()
     description = input("Enter assignment description: ")
     
     return f"""
@@ -60,9 +98,37 @@ def get_create_assignment_task():
     - Display grade as: Points (10 is total points)
 """
 
+def get_assignment_id_by_name(course_id):
+    assignments_response = get_assignments(course_id)
+    if not assignments_response.get('successfull'):
+        print("Failed to fetch assignments")
+        return None
+    
+    assignments_data = assignments_response['data']['response_data']
+    available_assignments = {assignment['name'].strip(): assignment['id'] for assignment in assignments_data}
+    
+    if not available_assignments:
+        print("No assignments found in this course")
+        return None
+    
+    print("\nAvailable assignments:")
+    for assignment_name in available_assignments.keys():
+        print(f"- {assignment_name}")
+    
+    while True:
+        assignment_name = input("\nEnter assignment name: ").strip()
+        if assignment_name in available_assignments:
+            return available_assignments[assignment_name]
+        print(f"Assignment '{assignment_name}' not found. Please try again.")
+
 def get_review_assignment_task():
-    course_id = input("Enter course ID: ")
-    assignment_id = input("Enter assignment ID: ")
+    course_id = get_course_id_by_name()
+    if not course_id:
+        return None
+        
+    assignment_id = get_assignment_id_by_name(course_id)
+    if not assignment_id:
+        return None
     
     return f"""
     You need to review the submissions for an assignment:
@@ -93,8 +159,9 @@ def main():
         print("Invalid choice. Please select 1 or 2.")
         return
     
-    response = user_proxy.initiate_chat(chatbot, message=task)
-    print(response.chat_history)
+    if task:
+        response = user_proxy.initiate_chat(chatbot, message=task)
+        print(response.chat_history)
 
 if __name__ == "__main__":
     main()
